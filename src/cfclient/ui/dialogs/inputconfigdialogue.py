@@ -63,13 +63,12 @@ class InputConfigDialogue(QtGui.QWidget, inputconfig_widget_class):
 
         self._input_device_reader.raw_axis_data_signal.connect(
             self._detect_axis)
+
         self._input_device_reader.raw_button_data_signal.connect(
             self._detect_button)
+
         self._input_device_reader.mapped_values_signal.connect(
             self._update_mapped_values)
-
-        self.cancelButton.clicked.connect(self.close)
-        self.saveButton.clicked.connect(self._save_config)
 
         self.detectPitch.clicked.connect(
             lambda: self._axis_detect(
@@ -136,9 +135,10 @@ class InputConfigDialogue(QtGui.QWidget, inputconfig_widget_class):
         self.configButton.clicked.connect(self._start_configuration)
         self.loadButton.clicked.connect(self._load_config_from_file)
         self.deleteButton.clicked.connect(self._delete_configuration)
+        self.cancelButton.clicked.connect(self.close)
+        self.saveButton.clicked.connect(self._save_config)
 
         self._popup = None
-        self._combined_button = None
         self._detection_buttons = [
             self.detectPitch, self.detectRoll,
             self.detectYaw, self.detectThrust,
@@ -152,6 +152,7 @@ class InputConfigDialogue(QtGui.QWidget, inputconfig_widget_class):
         self._axis_to_detect = ""
         self.combinedDetection = 0
         self._prev_combined_id = None
+        self._combined_button = None
 
         self._maxed_axis = []
         self._mined_axis = []
@@ -195,10 +196,6 @@ class InputConfigDialogue(QtGui.QWidget, inputconfig_widget_class):
             "thrust": self.thrustAxisValue,
         }
 
-    def _cancel_config_popup(self, button):
-        self._axis_to_detect = ""
-        self._button_to_detect = ""
-
     def _show_config_popup(self, caption, message, directions=[]):
         self._maxed_axis = []
         self._mined_axis = []
@@ -209,15 +206,20 @@ class InputConfigDialogue(QtGui.QWidget, inputconfig_widget_class):
         self._popup.addButton(self.cancelButton, QMessageBox.DestructiveRole)
         self._popup.setWindowTitle(caption)
         self._popup.setWindowFlags(Qt.Dialog | Qt.MSWindowsFixedSizeDialogHint)
+
         if len(directions) > 1:
             self._popup.originalMessage = message
             message = self._popup.originalMessage % directions[0]
             self._combined_button.setCheckable(True)
             self._combined_button.blockSignals(True)
-            self._popup.addButton(self._combined_button,
-                                  QMessageBox.ActionRole)
+            self._popup.addButton(self._combined_button, QMessageBox.ActionRole)
         self._popup.setText(message)
         self._popup.show()
+
+    def _close_config_popup(self):
+        if self._popup is not None:
+            self._popup.close()
+            self._popup = None
 
     def _start_configuration(self):
         self._input.enableRawReading(
@@ -228,49 +230,60 @@ class InputConfigDialogue(QtGui.QWidget, inputconfig_widget_class):
         for b in self._detection_buttons:
             b.setEnabled(True)
 
+    def _axis_detected(self, a):
+        return (a in self._maxed_axis and
+                a in self._mined_axis and
+                len(self._axis_to_detect) > 0)
+
     def _detect_axis(self, data):
-        if (len(self._axis_to_detect) > 0):
-            if (self._combined_button and self._combined_button.isChecked() and
-                    self.combinedDetection == 0):
-                self._combined_button.setDisabled(True)
-                self.combinedDetection = 1
-            for a in data:
-                # Axis must go low and high before it's accepted as selected
-                # otherwise maxed out axis (like gyro/acc) in some controllers
-                # will always be selected. Not enforcing negative values makes
-                # it possible to detect split axis (like bumpers on PS3
-                # controller)
-                if a not in self._maxed_axis and abs(data[a]) > 0.8:
-                    self._maxed_axis.append(a)
-                if a not in self._mined_axis and abs(data[a]) < 0.1:
-                    self._mined_axis.append(a)
-                if a in self._maxed_axis and a in self._mined_axis and len(
-                        self._axis_to_detect) > 0:
-                    if self.combinedDetection == 0:
-                        if data[a] >= 0:
-                            self._map_axis(self._axis_to_detect, a, 1.0)
-                        else:
-                            self._map_axis(self._axis_to_detect, a, -1.0)
-                        self._axis_to_detect = ""
-                        self._check_and_enable_saving()
-                        if self._popup is not None:
-                            self.cancelButton.click()
-                    elif self.combinedDetection == 2:  # finished detection
-                        # not the same axis again ...
-                        if self._prev_combined_id != a:
-                            self._map_axis(self._axis_to_detect, a, -1.0)
-                            self._axis_to_detect = ""
-                            self._check_and_enable_saving()
-                            if (self._popup is not None):
-                                self.cancelButton.click()
-                            self.combinedDetection = 0
-                    elif self.combinedDetection == 1:
-                        self._map_axis(self._axis_to_detect, a, 1.0)
-                        self._prev_combined_id = a
-                        self.combinedDetection = 2
-                        message = (self._popup.originalMessage %
-                                   self._popup.directions[1])
-                        self._popup.setText(message)
+        if (len(self._axis_to_detect) < 1):
+            return
+
+        if (self._combined_button and self._combined_button.isChecked() and
+                self.combinedDetection == 0):
+            self._combined_button.setDisabled(True)
+            self.combinedDetection = 1
+
+        for a in data:
+            # Axis must go low and high before it's accepted as selected
+            # otherwise maxed out axis (like gyro/acc) in some controllers
+            # will always be selected. Not enforcing negative values makes
+            # it possible to detect split axis (like bumpers on PS3
+            # controller)
+            if a not in self._maxed_axis and abs(data[a]) > 0.8:
+                self._maxed_axis.append(a)
+
+            if a not in self._mined_axis and abs(data[a]) < 0.1:
+                self._mined_axis.append(a)
+
+            if not self._axis_detected(a):
+                continue
+
+            if self.combinedDetection == 0:
+                if data[a] >= 0:
+                    self._map_axis(self._axis_to_detect, a, 1.0)
+                else:
+                    self._map_axis(self._axis_to_detect, a, -1.0)
+                self._axis_to_detect = ""
+                self._check_and_enable_saving()
+                self._close_config_popup()
+
+            elif self.combinedDetection == 2:  # finished detection
+                # not the same axis again ...
+                if self._prev_combined_id != a:
+                    self._map_axis(self._axis_to_detect, a, -1.0)
+                    self._axis_to_detect = ""
+                    self._check_and_enable_saving()
+                    self._close_config_popup()
+                    self.combinedDetection = 0
+
+            elif self.combinedDetection == 1:
+                self._map_axis(self._axis_to_detect, a, 1.0)
+                self._prev_combined_id = a
+                self.combinedDetection = 2
+                message = (self._popup.originalMessage %
+                           self._popup.directions[1])
+                self._popup.setText(message)
 
     def _update_mapped_values(self, mapped_data):
         for v in mapped_data.get_all_indicators():
@@ -279,11 +292,13 @@ class InputConfigDialogue(QtGui.QWidget, inputconfig_widget_class):
                     self._buttonindicators[v].setChecked(True)
                 else:
                     self._buttonindicators[v].setChecked(False)
+
             if v in self._axisindicators:
                 # The sliders used are set to 0-100 and the values from the
                 # input-layer is scaled according to the max settings in
                 # the input-layer. So scale the value and place 0 in the middle
                 scaled_value = mapped_data.get(v)
+
                 if v == "thrust":
                     scaled_value = InputConfigDialogue._scale(
                         self._input.max_thrust, scaled_value
@@ -331,8 +346,7 @@ class InputConfigDialogue(QtGui.QWidget, inputconfig_widget_class):
                     self._map_button(self._button_to_detect, b)
                     self._button_to_detect = ""
                     self._check_and_enable_saving()
-                    if self._popup is not None:
-                        self._popup.close()
+                    self._close_config_popup()
 
     def _check_and_enable_saving(self):
         needed_funcs = ["thrust", "yaw", "roll", "pitch"]
