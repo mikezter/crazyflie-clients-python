@@ -51,7 +51,8 @@ except Exception:
 
 # Statically listing the available input readers
 input_readers = ["linuxjsdev",
-                 "pysdl2"]
+                 "pysdl2",
+                 "sdl_gamecontroller"]
 
 logger.info("Input readers: {}".format(input_readers))
 
