@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 )
 
 
-class InputConfigDialogue(QtGui.QWidget, inputconfig_widget_class):
+class InputConfigDialogue(QtGui.QDialog, inputconfig_widget_class):
 
     def __init__(self, joystickReader, *args):
         super(InputConfigDialogue, self).__init__(*args)
