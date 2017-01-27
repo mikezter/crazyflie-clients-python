@@ -52,6 +52,25 @@ cfzmq
 
 **NOTE:** To use the Crazyradio you will have to [install the drivers](https://wiki.bitcraze.io/doc:crazyradio:install_windows_zadig)
 
+### Working on the client with PyCharm
+
+Pycharm is an IDE for python. Any IDE or development environment will work for the Crazyflie client. The key here is to use the miniconda python interpreter from the environment created earlier, this can be applied to other development environment.
+
+To work on the Crazyflie firmware with Pycharm, install pycharm comunity edition and open the Crazyflie client folder in it. Then:
+
+ - Go to file>settings
+ - Go to "Project: crazyflie-clients-python" > Project interpreter
+ - Press the cog on the top right, beside "Project interpreter" and click "add local"
+ - Locate the interpreter under \<miniconda_root\>\env\cfclient\python.exe (for example C:\Miniconda3\envs\cfclient\python.exe, see [screenshoot](https://wiki.bitcraze.io/_media/doc:crazyflie:client:pycfclient:cfclient_pycharm_windows_miniconda.png?t=1483971038&w=500&h=358&tok=9e4a0c))
+ - Validate with OK two times
+ - Open the bin/cfclient file in the pycharm editor and then "Run>Run 'cfclient'" will start the client
+ 
+You are now able to edit and debug the python code. you can edit the .ui files for the GUI with QtDesigner. To can launch it type ```designer``` in the conda cfclient environment (ie. after typing ```activate cfclient`` in a cmd console).
+
+#### Mac OSX
+
+type ```open -a Designer``` in a terminal to open the Designer application.
+
 ### Creating Windows installer
 
 When you are able to run from source, you can build the windows executable and installer.
@@ -105,9 +124,13 @@ they might or might not be affected by this.
 
     If you already have pyqt installed for python2 you need to uninstall it first
 
+    PyQt4 has been replaced by PyQt5 in brew and PyQt4 has been moved to the boneyard. Until this project is upgraded
+    to use PyQt5 you will have to install from the boneyard. See issue #269.
+
+
     ```
     brew uninstall pyqt
-    brew install pyqt --with-python3
+    brew install homebrew/boneyard/pyqt --with-python3
     ```
 
 1. Install remaining dependencies
